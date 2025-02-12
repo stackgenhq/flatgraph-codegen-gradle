@@ -1,0 +1,70 @@
+name: Pre Merge Checks
+
+on:
+  pull_request:
+    branches:
+      - '*'
+
+jobs:
+  preMerge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    if: ${{ !contains(github.event.head_commit.message, 'ci skip') }}
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Pre-merge checks
+        run: ./gradlew preMerge --continue
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: |
+            **/build/test-results/**/*.xml
+      - name: Upload HTML Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Test results
+          path: |
+            **/build/reports/tests
+          retention-days: 7
+      - name: Publish Ktlint reports
+        uses: lcollins/checkstyle-github-action@v2
+        if: always()
+        with:
+          path: "**/build/reports/ktlint/**/*Check.xml"
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatgraph-codegen-gradle
+          path: plugin-build/flatgraph-codegen-gradle/build/libs/flatgraph-codegen-gradle-*.jar
+          retention-days: 7
+          if-no-files-found: error
+      - name: Vulnerability Scan
+        uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
+          TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db:1
+        with:
+          scan-type: 'rootfs'
+          scan-ref: plugin-build/flatgraph-codegen-gradle/build/libs/
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+      - name: Run the plugin
+        run: ./gradlew generateDomainClasses
+        if: success()
+      - name: Verify the classes were generated
+        run: test -f example/build/generated/flatgraph/main/scala/flatgraph/generated/nodes/Mynodetype.scala
+        if: success()
