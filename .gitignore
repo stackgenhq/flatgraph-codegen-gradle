@@ -206,3 +206,6 @@ gradle-app.setting
 
 # local properties
 gradle-local.properties
+
+# kotlin/k2 process files
+.kotlin
