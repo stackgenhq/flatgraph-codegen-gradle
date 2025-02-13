@@ -43,3 +43,7 @@ object CpgExtSchema {
 ```
 
 See also [example](example/build.gradle.kts)
+
+## Contributing
+
+Please read [CONTRIBUTING.md](.github/CONTRIBUTING.md) for details on contributing and our code of conduct.
